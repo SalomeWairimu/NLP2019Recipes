@@ -1,7 +1,7 @@
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import sys
-import ssl 
+import ssl
 from measurement.measures import Volume
 import nltk
 from nltk import word_tokenize
@@ -14,13 +14,13 @@ nltk.download('averaged_perceptron_tagger')
 url = 'https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/?internalSource=hub%20recipe&referringContentType=Search' #will be given this
 page = urlopen(url)
 soup = BeautifulSoup(page, 'html.parser')
-ingredients = [] 
+ingredients = []
 
 
 class Step:
     def __init__(self, text):
         self.text = 'You ' + text
-    
+
     def __parse__(self):
         global ingredients
         tokenized = word_tokenize(self.text)
@@ -35,6 +35,10 @@ class Step:
             if ing[2] in self.text:
                 self.step_ingreds.append(ing[2])
 
+
+def intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3
 
 
 def get_ingredients():
@@ -56,18 +60,18 @@ def get_ingredients():
                 posn = i
             elif tags[i][1] == 'CD' and tags[i + 1][1] == '(':
                 product = float(Fraction(tags[i][0]))
-                posn = i  
+                posn = i
             # elif tags[i][1].startswith('JJ'): #descriptor words
             #     descriptor.append(tags[i][0])
-            # elif tags[i][1].startswith('VB'): #prep verbs 
+            # elif tags[i][1].startswith('VB'): #prep verbs
             #     prep.append(tags[i][0])
             # elif tags[i][1].startswith('NN'): #its a name
             #     name.append(tags[i][0])
-        product = sum * product 
+        product = sum * product
         unit = tags[posn + 1][0]
         if tags[posn + 2][0] == ')':
             posn += 2
-        # name = ' '.join([x for x in name if x != unit]) 
+        # name = ' '.join([x for x in name if x != unit])
         name = ' '.join(tokenized[posn + 2:])
         ingredients.append((product, unit, name)) #descriptor, prep))
 
@@ -85,7 +89,7 @@ if __name__ == "__main__":
     get_ingredients()
     steps = get_instructions()
     print(steps[0].__parse__())
-    
+
 #print(ingredients)
 #print(checklist_items)
 
