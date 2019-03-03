@@ -27,17 +27,26 @@ class Step:
         self.verbs = []
         tags = nltk.pos_tag(tokenized)
         #print(tags)
-        self.step_ingreds = []
+        self.step_ingreds = [] #ingredients which pertain to the current STEP (sentence)
         for i in range(len(tokenized)):
             if tags[i][1].startswith('VB'):
                 self.verbs.append(tags[i][0])
         for ing in ingredients:
-            if ing[2] in self.text:
+            if ing[2] in self.step_ingreds:
+                ind = tokenized.index(intersection(ing[2].split(), tokenized)[0])
+                while ind > 0:
+                    if tags[ind][1] == 'CD':
+                        self.step_ingreds.append(tags[ind][0] + ' ' + ing[1] + ' ' + ing[2])
+                        break
+                    ind -= 1
+            elif intersection(ing[2].split(), tokenized): #if the ingredient is in our step, add to list of pertaining ingredients
                 self.step_ingreds.append(ing[2])
-
+        self.step_ingreds = set(self.step_ingreds)
+        print(self.step_ingreds)
 
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
+    print(lst3)
     return lst3
 
 
@@ -81,14 +90,16 @@ def get_instructions():
     steps = []
     for instruct in instructions:
         text = instruct.text.strip().split('.')
-        steps += [Step(t) for t in text]
+        steps += [Step(t) for t in text if len(t) > 0]
     return steps
 
 
 if __name__ == "__main__":
     get_ingredients()
     steps = get_instructions()
-    print(steps[0].__parse__())
+    for x in steps:
+        print(x.text)
+    steps[3].__parse__()
 
 #print(ingredients)
 #print(checklist_items)
