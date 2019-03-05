@@ -15,6 +15,7 @@ url = 'https://www.allrecipes.com/recipe/212721/indian-chicken-curry-murgh-kari/
 page = urlopen(url)
 soup = BeautifulSoup(page, 'html.parser')
 ingredients = []
+cooking_verbs = ['bake', 'barbeque', 'baste', 'batter', 'beat', 'blanch', 'blend', 'boil', 'broil', 'carmelize', 'chop', 'clarify', 'cream', 'cure', 'deglaze', 'degrease', 'dice', 'dissolve' 'dredge', 'drizzle', 'dust', 'fillet', 'flake', 'flambe', 'fold', 'fricasse', 'fry', 'garnish', 'glaze', 'grate', 'grind', 'julienne', 'knead', 'marinate', 'meuniere', 'mince', 'mix', 'pan-broil', 'pan-fry', 'parboil', 'pare', 'peel', 'pickle', 'pit', 'plump', 'poach', 'puree', 'reduce', 'refresh', 'roast', 'saute', 'scald', 'scallop', 'score', 'sear', 'shred', 'sift', 'simmer', 'skim', 'steam', 'steep', 'sterilize', 'stew', 'stir', 'toss', 'truss', 'whip', 'preheat']
 
 
 class Step:
