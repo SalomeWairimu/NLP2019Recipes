@@ -1,49 +1,47 @@
-from urllib.request import urlopen
-from bs4 import BeautifulSoup
-import sys
+from fractions import Fraction
 import ssl
+import sys
+from urllib.request import urlopen
+
+from bs4 import BeautifulSoup
+from measurement.measures import Volume
 import nltk
 from nltk import word_tokenize
-from fractions import Fraction
-
+import spacy
 
 ssl._create_default_https_context = ssl._create_unverified_context
 # nltk.download('punkt')
 # nltk.download('averaged_perceptron_tagger')
-# url = 'https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/'
-url = 'https://www.allrecipes.com/recipe/212721/indian-chicken-curry-murgh-kari/'
+urls = ['https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/',
+        'https://www.allrecipes.com/recipe/212721/indian-chicken-curry-murgh-kari/',
+        'https://www.allrecipes.com/recipe/91192/french-onion-soup-gratinee/',
+        'https://www.allrecipes.com/recipe/60598/vegetarian-korma/'
+        ]
+url = urls[3]
 page = urlopen(url)
 soup = BeautifulSoup(page, 'html.parser')
 ingredients = []
-cooking_verbs = ['bake', 'barbeque', 'baste', 'batter', 'beat', 'blanch', 'blend', 'boil', 'broil', 'carmelize', 'chop', 'clarify', 'cream', 'cure', 'deglaze', 'degrease', 'dice', 'dissolve' 'dredge', 'drizzle', 'dust', 'fillet', 'flake', 'flambe', 'fold', 'fricasse', 'fry', 'garnish', 'glaze', 'grate', 'grind', 'julienne', 'knead', 'marinate', 'meuniere', 'mince', 'mix', 'pan-broil', 'pan-fry', 'parboil', 'pare', 'peel', 'pickle', 'pit', 'plump', 'poach', 'puree', 'reduce', 'refresh', 'roast', 'saute', 'scald', 'scallop', 'score', 'sear', 'shred', 'sift', 'simmer', 'skim', 'steam', 'steep', 'sterilize', 'stew', 'stir', 'toss', 'truss', 'whip', 'preheat']
+cooking_verbs = ['bake', 'barbeque', 'baste', 'batter', 'beat', 'blanch', 'blend', 'boil', 'broil', 'carmelize', 'chop', 'clarify', 'cream', 'cure', 'deglaze', 'degrease', 'dice', 'dissolve' 'dredge', 'drizzle', 'dust', 'fillet', 'flake', 'flambe', 'fold', 'fricasse', 'fry', 'garnish', 'glaze', 'grate', 'grind', 'julienne', 'knead', 'marinate', 'meuniere', 'mince', 'mix', 'pan-broil', 'pan-fry', 'parboil', 'pare', 'peel', 'pickle', 'pit', 'plump', 'poach', 'puree', 'reduce', 'refresh', 'roast', 'saute', 'scald', 'scallop', 'score', 'sear', 'season', 'shred', 'sift', 'simmer', 'skim', 'steam', 'steep', 'sterilize', 'stew', 'stir', 'toss', 'truss', 'whip', 'preheat']
+to_be_verbs = ['be', 'is', 'are', 'was']
+measurements_list = ['bunch', 'clove', 'pinch', 'slice', 'sprig', 'cup', 'tablespoon', 'teaspoon', 'ounce', 'can', 'pint', 'quart', 'gallon', 'tsp', 'tbsp', 'tblsp', 'tbs', 'lb', 'pound', 'oz', 'c', 'pt', 'qt', 'gal']
 
 
 class Step:
     def __init__(self, text):
-        self.text = 'You ' + text
+        self.text = "You " + text.strip()[0:1].lower() + text.strip()[1:]
+        self.__parse__()
 
     def __parse__(self):
-        global ingredients
-        tokenized = word_tokenize(self.text)
+        nlp = spacy.load('en_core_web_sm')
+        tokens = nlp(self.text)
         self.verbs = []
-        tags = nltk.pos_tag(tokenized)
-        self.step_ingreds = []  # ingredients which pertain to the current STEP (sentence)
-        for i in range(len(tokenized)):
-            if tags[i][1].startswith('VB'):
-                self.verbs.append(tags[i][0])
-        for ing in ingredients:
-            if ing[2] in self.step_ingreds:
-                ind = tokenized.index(intersection(ing[2].split(), tokenized)[0])
-                while ind > 0:
-                    if tags[ind][1] == 'CD':
-                        self.step_ingreds.append(tags[ind][0] + ' ' + ing[1] + ' ' + ing[2])
-                        break
-                    ind -= 1
-            elif intersection(ing[2].split(), tokenized):  # if the ingredient is in our step, add to list of pertaining ingredients
-                self.step_ingreds.append(ing[2])
-        self.step_ingreds = set(self.step_ingreds)
-        print("Ingrediaents: " + str(self.step_ingreds))
-        print("Verbs: " + str(self.verbs))
+        for token in tokens:
+            print(token.text + "\t" + token.tag_ + "\t" + token.dep_)
+            if token.tag_ in ["VB", "VBP", "VBZ"] and token.text not in to_be_verbs:
+                self.verbs.append(token)
+
+    def get_verbs(self):
+        return [v.text for v in self.verbs]
 
 
 def intersection(lst1, lst2):
@@ -55,37 +53,61 @@ def intersection(lst1, lst2):
 
 def get_ingredients():
     checklist_items = soup.find_all(class_='checkList__line')[0:-3]
+    nlp = spacy.load('en_core_web_sm')
     global ingredients
     for item in checklist_items:
         text = item.text.strip()
-        tokenized = word_tokenize(text)
-        descriptor = []
-        prep = []
+        # tokenized = word_tokenize(text)
+        tokens = nlp(text)
+        # descriptor = []
+        # prep = []
         name = []
         sum = 0
         product = 1
-        tags = nltk.pos_tag(tokenized)
+        # tags = nltk.pos_tag(tokenized)
         posn = 0
-        for i in range(len(tags)):
-            if tags[i][1] == 'CD' and tags[i + 1][1] != '(':
-                sum += float(Fraction(tags[i][0]))
+        for i in range(len(tokens)):
+            print(tokens[i].text + "\t" + tokens[i].tag_ + "\t" + tokens[i].dep_)
+            if tokens[i].tag_ in ['CD', 'LS'] and tokens[i + 1].tag_ != '(':
+                sum += float(Fraction(tokens[i].text))
                 posn = i
-            elif tags[i][1] == 'CD' and tags[i + 1][1] == '(':
-                product = float(Fraction(tags[i][0]))
+            elif tokens[i].tag_ in ['CD', 'LS'] and tokens[i + 1].tag_ == '(':
+                product = float(Fraction(tokens[i].text))
                 posn = i
-            # elif tags[i][1].startswith('JJ'): #descriptor words
-            #     descriptor.append(tags[i][0])
-            # elif tags[i][1].startswith('VB'): #prep verbs
-            #     prep.append(tags[i][0])
-            # elif tags[i][1].startswith('NN'): #its a name
-            #     name.append(tags[i][0])
+        # for i in range(len(tags)):
+        #     if tags[i][1] == 'CD' and tags[i + 1][1] != '(':
+        #         sum += float(Fraction(tags[i][0]))
+        #         posn = i
+        #     elif tags[i][1] == 'CD' and tags[i + 1][1] == '(':
+        #         product = float(Fraction(tags[i][0]))
+        #         posn = i
+        #     elif tags[i][1].startswith('JJ'): #descriptor words
+        #         descriptor.append(tags[i][0])
+        #     elif tags[i][1].startswith('VB'): #prep verbs
+        #         prep.append(tags[i][0])
+        #     elif tags[i][1].startswith('NN'): #its a name
+        #         name.append(tags[i][0])
         product = sum * product
-        unit = tags[posn + 1][0]
-        if tags[posn + 2][0] == ')':
+        potential_unit = tokens[posn + 1]
+        if not potential_unit.tag_.startswith('JJ'):
+            unit = potential_unit.text if is_unit(potential_unit.text) else None
+        else:
+            second_unit = potential_unit.head.text
+            unit = (potential_unit.text + " " + second_unit) if is_unit(second_unit) else None
+            posn += 1 if unit else 0
+        if tokens[posn + 2].text == ')':
             posn += 2
         # name = ' '.join([x for x in name if x != unit])
-        name = ' '.join(tokenized[posn + 2:])
-        ingredients.append((product, unit, name))  # descriptor, prep))
+        name = ''.join(tokens[posn + (2 if unit else 1):].text)
+        ingredients.append((product if product > 0 else None, unit, name))  # descriptor, prep))
+
+
+def is_unit(text):
+    # for unit in measurements_list:
+    #     if text in unit or text[0:-1] in unit or (len(text) > 2 and text[0:-2] in unit):
+    if text in measurements_list or text[0:-1] in measurements_list or (len(text) > 2 and text[0:-2] in measurements_list):
+        return True
+    return False
 
 
 def get_instructions():
@@ -99,8 +121,10 @@ def get_instructions():
 
 if __name__ == "__main__":
     get_ingredients()
+    for ingredient in ingredients:
+        print(ingredient)
     steps = get_instructions()
     for x in range(len(steps)):
-        print("Step " + str(x) + ": " + str(steps[x].text[3:]))
-        steps[x].__parse__()
+        print("Step " + str(x + 1) + ": " + str(steps[x].text))
+        print(steps[x].get_verbs())
         print("")
