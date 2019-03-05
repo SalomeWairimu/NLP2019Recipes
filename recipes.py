@@ -17,7 +17,7 @@ urls = ['https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/',
         'https://www.allrecipes.com/recipe/91192/french-onion-soup-gratinee/',
         'https://www.allrecipes.com/recipe/60598/vegetarian-korma/'
         ]
-url = urls[3]
+url = urls[2]
 page = urlopen(url)
 soup = BeautifulSoup(page, 'html.parser')
 ingredients = []
@@ -36,7 +36,7 @@ class Step:
         tokens = nlp(self.text)
         self.verbs = []
         for token in tokens:
-            print(token.text + "\t" + token.tag_ + "\t" + token.dep_)
+            # print(token.text + "\t" + token.tag_ + "\t" + token.dep_)
             if token.tag_ in ["VB", "VBP", "VBZ"] and token.text not in to_be_verbs:
                 self.verbs.append(token)
 
@@ -57,23 +57,28 @@ def get_ingredients():
     global ingredients
     for item in checklist_items:
         text = item.text.strip()
-        # tokenized = word_tokenize(text)
         tokens = nlp(text)
-        # descriptor = []
-        # prep = []
+        descriptor = []
+        preparation = []
         name = []
         sum = 0
         product = 1
-        # tags = nltk.pos_tag(tokenized)
         posn = 0
         for i in range(len(tokens)):
-            print(tokens[i].text + "\t" + tokens[i].tag_ + "\t" + tokens[i].dep_)
+            # print(tokens[i].text + "\t" + tokens[i].tag_ + "\t" + tokens[i].dep_)
+            # Quantities
             if tokens[i].tag_ in ['CD', 'LS'] and tokens[i + 1].tag_ != '(':
                 sum += float(Fraction(tokens[i].text))
                 posn = i
             elif tokens[i].tag_ in ['CD', 'LS'] and tokens[i + 1].tag_ == '(':
                 product = float(Fraction(tokens[i].text))
                 posn = i
+            # Descriptors
+            elif tokens[i].tag_.startswith('JJ') and tokens[i].dep_ not in ['nsubj', 'dobj', 'pobj']:
+                descriptor.append(i)
+            # Prep steps
+            elif tokens[i].tag_ in ['VBN', 'RB']:
+                preparation.append(i)
         # for i in range(len(tags)):
         #     if tags[i][1] == 'CD' and tags[i + 1][1] != '(':
         #         sum += float(Fraction(tags[i][0]))
@@ -97,14 +102,23 @@ def get_ingredients():
             posn += 1 if unit else 0
         if tokens[posn + 2].text == ')':
             posn += 2
-        # name = ' '.join([x for x in name if x != unit])
-        name = ''.join(tokens[posn + (2 if unit else 1):].text)
-        ingredients.append((product if product > 0 else None, unit, name))  # descriptor, prep))
+        name = ''
+        desc = ''
+        prep = ''
+        for i in range(posn + (2 if unit else 1), len(tokens)):
+            if i in descriptor:
+                desc += tokens[i].text + ' '
+            elif i in preparation:
+                prep += tokens[i].text + ' '
+            elif tokens[i].text not in ['or', 'and', ',']:
+                name += tokens[i].text + ' '
+        name = name.strip()
+        desc = desc.strip()
+        prep = prep.strip()
+        ingredients.append((product if product > 0 else None, unit, desc, prep, name))
 
 
 def is_unit(text):
-    # for unit in measurements_list:
-    #     if text in unit or text[0:-1] in unit or (len(text) > 2 and text[0:-2] in unit):
     if text in measurements_list or text[0:-1] in measurements_list or (len(text) > 2 and text[0:-2] in measurements_list):
         return True
     return False
@@ -122,7 +136,12 @@ def get_instructions():
 if __name__ == "__main__":
     get_ingredients()
     for ingredient in ingredients:
-        print(ingredient)
+        line = ''
+        for i in ingredient:
+            if i is None:
+                continue
+            line += str(i).strip() + " "
+        print(line)
     steps = get_instructions()
     for x in range(len(steps)):
         print("Step " + str(x + 1) + ": " + str(steps[x].text))
