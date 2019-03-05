@@ -2,16 +2,16 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import sys
 import ssl
-from measurement.measures import Volume
 import nltk
 from nltk import word_tokenize
 from fractions import Fraction
 
 
 ssl._create_default_https_context = ssl._create_unverified_context
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-url = 'https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/?internalSource=hub%20recipe&referringContentType=Search' #will be given this
+# nltk.download('punkt')
+# nltk.download('averaged_perceptron_tagger')
+# url = 'https://www.allrecipes.com/recipe/18511/hash-brown-casserole-ii/'
+url = 'https://www.allrecipes.com/recipe/212721/indian-chicken-curry-murgh-kari/'
 page = urlopen(url)
 soup = BeautifulSoup(page, 'html.parser')
 ingredients = []
@@ -26,8 +26,7 @@ class Step:
         tokenized = word_tokenize(self.text)
         self.verbs = []
         tags = nltk.pos_tag(tokenized)
-        #print(tags)
-        self.step_ingreds = [] #ingredients which pertain to the current STEP (sentence)
+        self.step_ingreds = []  # ingredients which pertain to the current STEP (sentence)
         for i in range(len(tokenized)):
             if tags[i][1].startswith('VB'):
                 self.verbs.append(tags[i][0])
@@ -39,19 +38,22 @@ class Step:
                         self.step_ingreds.append(tags[ind][0] + ' ' + ing[1] + ' ' + ing[2])
                         break
                     ind -= 1
-            elif intersection(ing[2].split(), tokenized): #if the ingredient is in our step, add to list of pertaining ingredients
+            elif intersection(ing[2].split(), tokenized):  # if the ingredient is in our step, add to list of pertaining ingredients
                 self.step_ingreds.append(ing[2])
         self.step_ingreds = set(self.step_ingreds)
-        print(self.step_ingreds)
+        print("Ingrediaents: " + str(self.step_ingreds))
+        print("Verbs: " + str(self.verbs))
+
 
 def intersection(lst1, lst2):
-    lst3 = [value for value in lst1 if value in lst2]
-    print(lst3)
+    lst3 = [value for value in lst1 if value in lst2 and len(value) > 2]
+    if len(lst3) > 0:
+        print("Intersection: " + str(lst3))
     return lst3
 
 
 def get_ingredients():
-    checklist_items = soup.find_all(class_= 'checkList__line')[0:-3]
+    checklist_items = soup.find_all(class_='checkList__line')[0:-3]
     global ingredients
     for item in checklist_items:
         text = item.text.strip()
@@ -82,7 +84,7 @@ def get_ingredients():
             posn += 2
         # name = ' '.join([x for x in name if x != unit])
         name = ' '.join(tokenized[posn + 2:])
-        ingredients.append((product, unit, name)) #descriptor, prep))
+        ingredients.append((product, unit, name))  # descriptor, prep))
 
 
 def get_instructions():
@@ -97,13 +99,7 @@ def get_instructions():
 if __name__ == "__main__":
     get_ingredients()
     steps = get_instructions()
-    for x in steps:
-        print(x.text)
-    steps[3].__parse__()
-
-#print(ingredients)
-#print(checklist_items)
-
-#text = word_tokenize(ingredients[12])
-#print(nltk.pos_tag(text))
-
+    for x in range(len(steps)):
+        print("Step " + str(x) + ": " + str(steps[x].text[3:]))
+        steps[x].__parse__()
+        print("")
