@@ -21,7 +21,9 @@ urls = [
     base_url + '212721',
     base_url + '91192',
     base_url + '60598',
-    base_url + '103895'
+    base_url + '103895',
+    base_url + '240425',
+    base_url + '69125'
     ]
 # AllRecipes URL to parse
 url = None
@@ -45,7 +47,7 @@ to_be_verbs = [
     ]
 measurements_list = [
     # Unique Collections
-    'bunch', 'can', 'clove', 'pinch', 'slice', 'sprig',
+    'bunch', 'can', 'clove', 'pinch', 'slice', 'sprig', 'rib',
     # Volumes
     'tsp', 'teaspoon', 'tbsp', 'tblsp', 'tbs', 'tablespoon', 'c', 'cup', 'pt', 'pint', 'qt', 'quart', 'gal', 'gallon',
     'ml', 'mL', 'milliliter', 'millilitre', 'l', 'L', 'liter', 'litre',
@@ -80,9 +82,10 @@ class Step:
         for i in range(len(tokens)):
             if (not tokens[i].tag_.startswith('NN')) or tokens[i].text in measurements_list:
                 continue
-            for ingredient in ingredients.keys():
+            for key in ingredients.keys():
+                ingredient = key.lower()
                 if tokens[i].text in ingredient:
-                    # print("Starting with: " + tokens[i].text)
+                    print("Starting with: " + tokens[i].text)
                     potential_ingredient = tokens[i].text
                     j = i - 1
                     while j > 0 and tokens[j].text in ingredient:
@@ -91,9 +94,11 @@ class Step:
                     self.ingredients.append(potential_ingredient)
         removals = []
         for i in range(len(self.ingredients)):
-            for j in range(len(self.ingredients)):
-                if self.ingredients[i] in self.ingredients[j] and self.ingredients[i] != self.ingredients[j]:
+            for j in range(i+1, len(self.ingredients)):
+                if self.ingredients[i] in self.ingredients[j]:
                     removals.append(i)
+                elif self.ingredients[j] in self.ingredients[i]:
+                    removals.append(j)
         self.ingredients = [self.ingredients[i] for i in range(len(self.ingredients)) if i not in removals]
         for i in range(len(self.ingredients)):
             self.ingredients[i] = find_largest_intersection(self.ingredients[i])
@@ -118,8 +123,9 @@ def find_largest_intersection(ingredient):
     ingredient_set = set(ingredient.split())
     largest_intersection = 0
     real_ingredient = None
-    for each in ingredients:
-        real_set = set(each.split())
+    for key in ingredients:
+        each = key.lower()
+        real_set = set(each.replace(',', ' ').split())
         intersect = len(ingredient_set.intersection(real_set))
         if intersect > largest_intersection:
             largest_intersection = intersect
@@ -159,7 +165,13 @@ def get_ingredients():
         sum = 0
         product = 1
         posn = 0
+        cutoff = len(tokens)
         for i in range(len(tokens)):
+            # Removing such as
+            if i + 1 < len(tokens):
+                if tokens[i].text == '(' and tokens[i+1].text == 'such':
+                    cutoff = i
+                    break
             # Quantities
             if tokens[i].tag_ in ['CD', 'LS'] and tokens[i + 1].text != '(':
                 try:
@@ -192,7 +204,7 @@ def get_ingredients():
         name = ''
         desc = ''
         prep = ''
-        for i in range(posn + (2 if unit else 1), len(tokens)):
+        for i in range(posn + (2 if unit else 1), cutoff):
             if i in descriptor:
                 desc += tokens[i].text + ' '
             elif i in preparation:
@@ -220,11 +232,34 @@ def get_instructions():
     return steps
 
 
+def get_primary_method(steps):
+    max = 0
+    max_step = 0
+    for step in steps:
+        num = 0
+        tokens = step.text.split()
+        if 'minutes' in tokens:
+            num = tokens[tokens.index('minutes')-1]
+            if num > max:
+                max = num
+                max_step = step
+        if 'hour' in tokens:
+            num = 60
+            if num > max:
+                max = num
+                max_step = step
+        if 'hours' in tokens:
+            num = tokens[tokens.index('hours')-1]
+            if num > max:
+                max = num
+                max_step = step
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         get_recipe(sys.argv[1])
     else:
-        get_recipe(urls[0])
+        get_recipe(urls[-2])
     get_ingredients()
     for external_rep, internal_rep in ingredients.items():
         print(external_rep)
@@ -233,6 +268,7 @@ if __name__ == "__main__":
             line += ((str(i).strip() + " | ") if i else "_ | ")
         print(">> " + line + "\n")
     steps = get_instructions()
+    get_primary_method(steps)
     for x in range(len(steps)):
         print("Step " + str(x + 1) + ": " + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]))
         print(steps[x].get_verbs())
