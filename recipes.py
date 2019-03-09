@@ -109,11 +109,12 @@ class Step:
                 continue
             for key in ingredients.keys():
                 ingredient = key
-                if self.tokens[i].text.lower() in ingredient.lower() or self.tokens[i].text.lower()[:-1] in ingredient.lower():
+                if self.tokens[i].text.lower() in ingredient.lower() or
+                (self.tokens[i].text.lower()[:-1] in ingredient.lower() and self.tokens[i].text.lower()[-1] == 's'):
                     # print("Starting with: " + self.tokens[i].text)
                     potential_ingredient = self.tokens[i].text
                     j = i - 1
-                    while j >= 0 and (self.tokens[j].text.lower() in ingredient.lower() or self.tokens[j].text.lower()[:-1] in ingredient.lower()):
+                    while j >= 0 and self.tokens[j].text.lower() in ingredient.lower():
                         potential_ingredient = self.tokens[j].text + " " + potential_ingredient
                         j -= 1
                     self.ingredients.append(potential_ingredient)
@@ -424,22 +425,31 @@ def display_recipe(ingredients, steps, style):
             i = 2
             line = 'Step ' + str(x + 1) + ': ' + str(tokens[1].text[0:1].upper()) + str(tokens[1].text[1:]) + ' '
             while i < len(tokens):
+                breaker = False
                 for loc in locations:
                     if i == locations[loc][0]:
+                        if ingredients[loc][-1] == 0:
+                            break
                         i = locations[loc][1] + 1
                         if ingredients[loc][0] == -1:
                             if tokens[locations[loc][0] - 1].text == ',':
                                 line = line[0:-2] + ' '
-                            if tokens[locations[loc][0] - 1].text == 'and':
+                            elif tokens[locations[loc][0] - 1].text == 'and':
                                 line = line[0:-4]
                                 if tokens[locations[loc][0] - 2].text == ',':
                                     line = line[0:-2] + ' '
-                            continue
+                            elif tokens[i].text == ',':
+                                i = i + 1
+                            elif tokens[i].text == 'and':
+                                i = i + 1
+                            breaker = True
+                            break
                         for t in ingredients[loc][:-1]:
                             line += ((str(t).strip() + ' ') if t else '')
-                        continue
-                if i == len(tokens):
-                    break
+                        breaker = True
+                        break
+                if i == len(tokens) or breaker:
+                    continue
                 if tokens[i].text in [',', '.', ';']:
                     line = line[0:-1]
                 line += tokens[i].text + ' '
@@ -455,7 +465,7 @@ def display_recipe(ingredients, steps, style):
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[2])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[1])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
