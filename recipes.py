@@ -7,7 +7,8 @@ import sys
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
-from measurement.measures import Volume
+from measurement.measures import Volume, Weight
+from measurement.utils import guess
 import nltk
 from nltk import word_tokenize
 import spacy
@@ -29,6 +30,8 @@ urls = [
     base_url + '91192',  # 3. French Onion Soup Gratinee
     base_url + '60598',  # 4. Vegetarian Korma
     base_url + '240425',  # 5. Dutch Oven Vegetable Beef Soup
+    base_url + '258077',  # 6. Soondubu Jjigae (Korean Soft Tofu Stew)
+    base_url + '262353'  # 7. Buffalo Tofu Wings
     ]
 # AllRecipes URL to parse
 url = None
@@ -51,20 +54,11 @@ cooking_verbs = [
     'sterilize', 'stew', 'stir', 'toss', 'truss', 'whip'
     ]
 # Used to resolve ties
-primary_verbs = ['bake', 'boil', 'fry', 'simmer', 'saute', 'roast', 'steam', 'stew']
+primary_verbs = ['bake', 'roast', 'simmer', 'fry', 'saute', 'steam', 'stew', 'boil']
 # Exclude conjugations of "to be" no matter what
 to_be_verbs = [
     'be', 'is', 'are', 'was'
     ]
-# Used to help conversion between vegetarian and non-vegetarian
-meat_products = [
-    'beef', 'chicken', 'pork', 'bacon', 'sausage', 'ham', 'lamb', 'meat', 'venison', 'veal', 'steak', 'ribs', 'filet mignon', 'shrimp',
-    'snail', 'oyster', 'fish', 'tilapia', 'tuna', 'salmon', 'walleye', 'mussels', 'pepperoni', 'salami', 'patty', 'turkey']
-# Maps meat products to suitable vegetarian replacements
-veggie_replacements = {
-    # 'tofu': ['beef', 'chicken', 'pork', 'shrimp', 'snail', 'oyster', 'mussels'],
-    'seitan': ['beef', 'chicken', 'pork', 'filet mignon', 'steak', 'venison', 'lamb', 'meat', 'ribs', 'turkey'],
-    'tempeh': ['fish', 'tilapia', 'tuna', 'salmon', 'walleye']}
 # If a word is in this list, we consider it a measurement unit.
 measurements_list = [
     # Unique Collections
@@ -88,9 +82,38 @@ tools = [
     'juicer', 'garlic press', 'dish', 'plate', 'platter', 'foil', 'stockpot',
     'crockpot', 'spatula', 'tongs', 'ladle', 'trivet', 'lid', 'splatter guard',
     'paper towel', 'thermometer', 'scale', 'parchment paper', 'baking sheet',
-    'glass', 'cup', 'tray', 'press', 'microwave', 'stove', 'stovetop', 'kettle',
+    'glass', 'cup', 'tray', 'microwave', 'stove', 'stovetop', 'kettle',
     'toaster', 'chopper', 'double boiler', 'steamer'
     ]
+# Used to help conversion from non-vegetarian to vegetarian
+meat_products = [
+    'beef', 'chicken', 'pork', 'bacon', 'sausage', 'ham', 'lamb', 'meat',
+    'venison', 'veal', 'steak', 'ribs', 'filet mignon', 'shrimp', 'snail',
+    'oyster', 'fish', 'tilapia', 'tuna', 'salmon', 'walleye', 'mussels',
+    'pepperoni', 'salami', 'patty', 'turkey'
+    ]
+# Maps meat products to suitable vegetarian replacements
+veggie_replacements = {
+    'seitan': ['chicken', 'pork', 'filet mignon', 'steak', 'venison', 'lamb', 'meat', 'ribs', 'turkey'],  # beef
+    'tempeh': ['fish', 'tilapia', 'tuna', 'salmon', 'walleye']
+    }
+# Used to help conversion from unhealthy to healthy
+unhealthy_products = [
+    'butter', 'canola oil', 'vegetable oil', 'bacon', 'chicken', 'beef', 'pork',
+    'venison', 'noodles', 'pasta', 'rice', 'couscous', 'croutons', 'salt'
+]
+# Maps unhealthy products to suitable healthy replacements
+healthy_replacements = {  # Buckwheat?
+    'coconut butter': ['butter'],
+    'coconut oil': ['canola oil', 'vegetable oil'],
+    'prosciutto': ['bacon'],
+    'turkey': ['chicken'],
+    'venison': ['beef', 'pork'],
+    'zoodles': ['noodles', 'pasta'],
+    'quinoa': ['rice', 'couscous'],
+    'nuts': ['croutons'],
+    'garlic powder': ['salt']
+}
 
 
 class Step:
@@ -109,8 +132,7 @@ class Step:
                 continue
             for key in ingredients.keys():
                 ingredient = key
-                if self.tokens[i].text.lower() in ingredient.lower() or
-                (self.tokens[i].text.lower()[:-1] in ingredient.lower() and self.tokens[i].text.lower()[-1] == 's'):
+                if self.tokens[i].text.lower() in ingredient.lower() or (self.tokens[i].text.lower()[:-1] in ingredient.lower() and self.tokens[i].text.lower()[-1] == 's'):
                     # print("Starting with: " + self.tokens[i].text)
                     potential_ingredient = self.tokens[i].text
                     j = i - 1
@@ -150,7 +172,7 @@ class Step:
         self.primary_method = ''
         last_verb = ''
         for i in range(len(self.tokens)):
-            if self.tokens[i].text in cooking_verbs:
+            if self.tokens[i].text.lower() in cooking_verbs:
                 last_verb = self.tokens[i].text
             if self.tokens[i].tag_ in ['CD', 'LS'] or self.tokens[i].text == 'an':
                 unit = self.tokens[i + 1].text
@@ -326,6 +348,8 @@ def get_primary_method(steps):
     max = 0
     max_step = "0"
     for step in steps:
+        if step.primary_method == '':
+            continue
         if step.time > max:
             max = step.time
             max_step = step.primary_method
@@ -333,10 +357,15 @@ def get_primary_method(steps):
             if max_step in primary_verbs:
                 continue
             max_step = step.primary_method
-    return "Primary cooking method is " + max_step + " for %d minutes." % max
+    if max_step == "0":
+        directions_text = soup.find_all(class_='directions--section__steps')[0].text.lower()
+        for verb in reversed(primary_verbs):
+            if verb in directions_text:
+                max_step = verb
+    return "Primary cooking method is " + max_step + "."  # + " for %d minutes." % max
 
 
-def convert_vegetarian(ingredients, steps):
+def convert_to_vegetarian(ingredients, steps):
     """Converts a recipe to vegetarian.
     """
     veg_ingredients = {}
@@ -347,7 +376,7 @@ def convert_vegetarian(ingredients, steps):
             for meat in meat_products:
                 if meat in ingredients[ingredient][4]:
                     replacement = "cream of mushroom soup" if 'cream' in ingredients[ingredient][4] else "vegetable broth"
-                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, replacement)
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
         else:
             for meat in meat_products:
                 if meat in ingredients[ingredient][4]:
@@ -355,26 +384,153 @@ def convert_vegetarian(ingredients, steps):
                     for veggie in veggie_replacements:
                         if meat in veggie_replacements[veggie]:
                             replacement = veggie
-                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, replacement)
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         veg_ingredients[m_key] = mod
     display_recipe(veg_ingredients, steps, 'Vegetarian ')
 
 
-def condense_ingredients(ingredients, ingredient, modified_ingredients, replacement):
+def convert_from_vegetarian(ingredients, steps):
+    """Converts a recipe to non-vegetarian.
+    """
+    nonveg_ingredients = {}
+    modified_ingredients = {}
+    vegetarian_foods = [*veggie_replacements]
+    vegetarian_foods.append('tofu')
+    print(vegetarian_foods)
+    addBacon = True
+    for ingredient in ingredients:
+        nonveg_ingredients[ingredient] = ingredients[ingredient]
+        # for meat in meat_products:
+        #     if meat in ingredients[ingredient][4]:
+        #         # This recipe was already non-vegetarian
+        #         display_recipe(ingredients, steps, 'Original, Non-Vegetarian ')
+        #         return
+        for veggie in vegetarian_foods:
+            if veggie in ingredients[ingredient][4]:
+                addBacon = False
+                replacement = "beef"
+                if veggie in veggie_replacements:
+                    replacement = veggie_replacements[veggie][0]
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+    for m_key, mod in modified_ingredients.items():
+        nonveg_ingredients[m_key] = mod
+    display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', True)
+
+
+def convert_from_healthy(ingredients, steps):
+    pass
+
+
+def convert_to_healthy(ingredients, steps):
+    """Makes a recipe healthy.
+    """
+    healthy_ingredients = {}
+    modified_ingredients = {}
+    for ingredient in ingredients:
+        healthy_ingredients[ingredient] = ingredients[ingredient]
+        for unhealthy in unhealthy_products:
+                if unhealthy in ingredients[ingredient][4]:
+                    replacement = None
+                    for healthy in healthy_replacements:
+                        if unhealthy in healthy_replacements[healthy]:
+                            replacement = healthy
+                    if replacement:
+                        modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+    for m_key, mod in modified_ingredients.items():
+        healthy_ingredients[m_key] = mod
+    display_recipe(healthy_ingredients, steps, 'Healthy ')
+
+
+def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement):
     """Given a tentative replacement during a transformation process, checks
     to ensure that the ingredient has not already been used. If it has, will
     condense the two to prevent duplication.
     """
     condense = None
+    ambiguous = None
     for m_key, mod in modified_ingredients.items():
         if mod[4] == replacement:
             condense = m_key
             break
+    if condense is None:
+        for i_key, i in ingredients.items():
+            if replacement in i[4]:
+                condense = i_key
+                ambiguous = i_key
+                modified_ingredients[ambiguous] = (
+                    ingredients[ambiguous][0],
+                    ingredients[ambiguous][1],
+                    ingredients[ambiguous][2],
+                    ingredients[ambiguous][3],
+                    ingredients[ambiguous][4],
+                    1
+                )
+                break
+    for step in steps:
+        if (condense in step.ingredients) != (ingredient in step.ingredients):
+            condense = None
+            break
     if condense is not None:
+        amt1 = modified_ingredients[condense][0]
+        unit1 = modified_ingredients[condense][1]
+        amt2 = ingredients[ingredient][0]
+        unit2 = ingredients[ingredient][1]
+        sum = amt1 + amt2
+        sum_unit = unit1
+        if unit1 != unit2:
+            if unit1[-1] == 's':
+                unit1 = unit1[:-1]
+            if unit2[-1] == 's':
+                unit2 = unit2[:-1]
+            if unit1 == 'fluid ounce':
+                unit1 = 'us_oz'
+            if unit2 == 'fluid ounce':
+                unit2 = 'us_oz'
+            m = None
+            try:
+                m = guess(float(amt1), unit1, measures=[Weight, Volume])
+            except Exception as e1:
+                try:
+                    m = guess(float(amt1), 'us_' + unit1, measures=[Weight, Volume])
+                except Exception as e2:
+                    pass
+            s = None
+            try:
+                s = guess(float(amt2), unit2, measures=[Weight, Volume])
+            except Exception as e1:
+                try:
+                    s = guess(float(amt2), 'us_' + unit2, measures=[Weight, Volume])
+                except Exception as e2:
+                    pass
+            if m is not None and s is not None:
+                type1 = None
+                type2 = None
+                try:
+                    m.oz
+                    type1 = 'weight'
+                except Exception as e:
+                    type1 = 'volume'
+                try:
+                    s.oz
+                    type2 = 'weight'
+                except Exception as e:
+                    type2 = 'volume'
+                if type1 == type2 == 'weight':
+                    sum_unit = 'oz'
+                    sum = m.oz + s.oz
+                elif type1 == type2 == 'volume':
+                    sum_unit = 'fl oz'
+                    sum = m.us_oz + s.us_oz
+                elif type1 == 'weight' and type2 == 'volume':
+                    sum_unit = 'ounces'
+                    sum = m.oz + s.us_oz
+                elif type1 == 'volume' and type2 == 'weight':
+                    sum_unit = 'ounces'
+                    sum = m.us_oz + s.oz
         modified_ingredients[condense] = (
-            modified_ingredients[condense][0] + ingredients[ingredient][0],
-            modified_ingredients[condense][1],
+            sum,
+            sum_unit,
             modified_ingredients[condense][2],
             modified_ingredients[condense][3],
             modified_ingredients[condense][4],
@@ -393,7 +549,7 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, replacem
     return modified_ingredients
 
 
-def display_recipe(ingredients, steps, style):
+def display_recipe(ingredients, steps, style, bacon=False):
     """Given a set of ingredients and steps,
     display them in a nice way to the user.
     """
@@ -408,6 +564,8 @@ def display_recipe(ingredients, steps, style):
             for i in internal_rep[:-1]:
                 line += ((str(i).strip() + ' ') if i else '')
             print(line)
+    if bacon:
+        print("Bacon bits, to taste")
     print()
     for x in range(len(steps)):
         modified = False
@@ -455,17 +613,19 @@ def display_recipe(ingredients, steps, style):
                 line += tokens[i].text + ' '
                 i += 1
             print(line)
-        print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
-        print('\tTools: ' + ', '.join(steps[x].get_tools())) if steps[x].get_tools() else 0
-        print('\tIngredients: ' + ', '.join(steps[x].ingredients)) if steps[x].ingredients else 0
-        print('\tPrimary Method: ' + steps[x].primary_method + ' %d minutes' % steps[x].time) if steps[x].primary_method else 0
-        print(steps[x].locations)
+        if debug:
+            print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
+            print('\tTools: ' + ', '.join(steps[x].get_tools())) if steps[x].get_tools() else 0
+            print('\tIngredients: ' + ', '.join(steps[x].ingredients)) if steps[x].ingredients else 0
+            print('\tPrimary Method: ' + steps[x].primary_method + ' %d minutes' % steps[x].time) if steps[x].primary_method else 0
         print()
+    if bacon:
+        print('Step ' + str(len(steps) + 1) + ': Sprinkle on bacon bits. Enjoy!')
     print(get_primary_method(steps))
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[1])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[7])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
@@ -488,13 +648,13 @@ if __name__ == "__main__":
             display_recipe(ingredients, steps, '')
         # Make a non-vegetarian recipe vegetarian
         elif val == '1':
-            convert_vegetarian(ingredients, steps)
+            convert_to_vegetarian(ingredients, steps)
         # Make a vegetarian recipe non-vegetarian
         elif val == '2':
-            pass
+            convert_from_vegetarian(ingredients, steps)
         # Make a recipe healthy
         elif val == '3':
-            pass
+            convert_to_healthy(ingredients, steps)
         # Make a recipe unhealth
         elif val == '4':
             pass
