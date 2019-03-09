@@ -35,6 +35,7 @@ url = None
 # The HTML parsed by BeautifulSoup
 soup = None
 recipe_name = ''
+ingredients = {}
 
 # If a verb is in this list, we consider it a cooking action
 cooking_verbs = [
@@ -102,19 +103,21 @@ class Step:
 
     def __parse__(self):
         self.ingredients = []
+        self.locations = {}
         for i in range(len(self.tokens)):
             if (not self.tokens[i].tag_.startswith('NN')) or self.tokens[i].text in measurements_list:
                 continue
             for key in ingredients.keys():
-                ingredient = key.lower()
-                if self.tokens[i].text in ingredient:
+                ingredient = key
+                if self.tokens[i].text.lower() in ingredient.lower() or self.tokens[i].text.lower()[:-1] in ingredient.lower():
                     # print("Starting with: " + self.tokens[i].text)
                     potential_ingredient = self.tokens[i].text
                     j = i - 1
-                    while j > 0 and self.tokens[j].text in ingredient:
+                    while j >= 0 and (self.tokens[j].text.lower() in ingredient.lower() or self.tokens[j].text.lower()[:-1] in ingredient.lower()):
                         potential_ingredient = self.tokens[j].text + " " + potential_ingredient
                         j -= 1
                     self.ingredients.append(potential_ingredient)
+                    self.locations[potential_ingredient] = (j + 1, i)
         removals = []
         for i in range(len(self.ingredients)):
             for j in range(i+1, len(self.ingredients)):
@@ -124,7 +127,13 @@ class Step:
                     removals.append(j)
         self.ingredients = [self.ingredients[i] for i in range(len(self.ingredients)) if i not in removals]
         for i in range(len(self.ingredients)):
+            prev = self.ingredients[i]
             self.ingredients[i] = find_largest_intersection(self.ingredients[i])
+            if self.ingredients[i]:
+                self.locations[self.ingredients[i]] = self.locations[prev]
+        for loc_key in list(self.locations):
+            if loc_key not in self.ingredients:
+                del self.locations[loc_key]
         self.ingredients = [i for i in self.ingredients if i]
         self.verbs = []
         self.tools = []
@@ -178,8 +187,8 @@ def find_largest_intersection(ingredient):
     largest_intersection = 0
     real_ingredient = None
     for key in ingredients:
-        each = key.lower()
-        real_set = set(each.replace(',', ' ').split())
+        each = key
+        real_set = set(each.lower().replace(',', ' ').split())
         intersect = len(ingredient_set.intersection(real_set))
         if intersect > largest_intersection:
             largest_intersection = intersect
@@ -222,9 +231,9 @@ def get_ingredients():
     as descriptions of ingredients which may modify the ingredient, and
     preparation actions which need to be done before starting the recipe.
     """
+    global ingredients
     checklist_items = soup.find_all(class_='checkList__line')[0:-3]
     nlp = spacy.load('en_core_web_sm')
-    ingredients = {}
     for item in checklist_items:
         text = item.text.strip()
         tokens = nlp(text)
@@ -284,7 +293,7 @@ def get_ingredients():
         desc = desc.strip()
         prep = prep.strip()
         # 0: quantity 1: unit 2: description 3: prep step 4: name
-        ingredients[text] = (product if product > 0 else None, unit, desc, prep, name)
+        ingredients[text] = (product if product > 0 else None, unit, desc, prep, name, 0)
     return ingredients
 
 
@@ -326,26 +335,61 @@ def get_primary_method(steps):
     return "Primary cooking method is " + max_step + " for %d minutes." % max
 
 
-def convert_vegetarian(steps):
+def convert_vegetarian(ingredients, steps):
     """Converts a recipe to vegetarian.
     """
     veg_ingredients = {}
+    modified_ingredients = {}
     for ingredient in ingredients:
         veg_ingredients[ingredient] = ingredients[ingredient]
-        for meat in meat_products:
-            if meat in ingredients[ingredient][4]:
-                replacement = "tofu"
-                for veggie in veggie_replacements:
-                    if meat in veggie_replacements[veggie]:
-                        replacement = veggie
-                veg_ingredients[ingredient] = (
-                    ingredients[ingredient][0],
-                    ingredients[ingredient][1],
-                    ingredients[ingredient][2],
-                    ingredients[ingredient][3],
-                    replacement
-                )
+        if 'soup' in ingredients[ingredient][4] or 'broth' in ingredients[ingredient][4]:
+            for meat in meat_products:
+                if meat in ingredients[ingredient][4]:
+                    replacement = "cream of mushroom soup" if 'cream' in ingredients[ingredient][4] else "vegetable broth"
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, replacement)
+        else:
+            for meat in meat_products:
+                if meat in ingredients[ingredient][4]:
+                    replacement = "tofu"
+                    for veggie in veggie_replacements:
+                        if meat in veggie_replacements[veggie]:
+                            replacement = veggie
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, replacement)
+    for m_key, mod in modified_ingredients.items():
+        veg_ingredients[m_key] = mod
     display_recipe(veg_ingredients, steps, 'Vegetarian ')
+
+
+def condense_ingredients(ingredients, ingredient, modified_ingredients, replacement):
+    """Given a tentative replacement during a transformation process, checks
+    to ensure that the ingredient has not already been used. If it has, will
+    condense the two to prevent duplication.
+    """
+    condense = None
+    for m_key, mod in modified_ingredients.items():
+        if mod[4] == replacement:
+            condense = m_key
+            break
+    if condense is not None:
+        modified_ingredients[condense] = (
+            modified_ingredients[condense][0] + ingredients[ingredient][0],
+            modified_ingredients[condense][1],
+            modified_ingredients[condense][2],
+            modified_ingredients[condense][3],
+            modified_ingredients[condense][4],
+            1
+        )
+        modified_ingredients[ingredient] = (-1, None, None, None, condense, 1)
+    else:
+        modified_ingredients[ingredient] = (
+            ingredients[ingredient][0],
+            ingredients[ingredient][1],
+            ingredients[ingredient][2],
+            ingredients[ingredient][3],
+            replacement,
+            1
+        )
+    return modified_ingredients
 
 
 def display_recipe(ingredients, steps, style):
@@ -354,26 +398,64 @@ def display_recipe(ingredients, steps, style):
     """
     print(style + recipe_name + "\n")
     for external_rep, internal_rep in ingredients.items():
-        print(external_rep)
-        if not debug:
-            continue
-        line = ''
-        for i in internal_rep:
-            line += ((str(i).strip() + ' | ') if i else '_ | ')
-        print('>> ' + line)
+        if internal_rep[-1] == 0:
+            print(external_rep)
+        else:
+            line = ''
+            if internal_rep[0] == -1:
+                continue
+            for i in internal_rep[:-1]:
+                line += ((str(i).strip() + ' ') if i else '')
+            print(line)
     print()
     for x in range(len(steps)):
-        print('Step ' + str(x + 1) + ': ' + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]))
+        modified = False
+        for i in steps[x].ingredients:
+            if ingredients[i][-1] == 1:
+                modified = True
+                break
+        if not modified:
+            print('Step ' + str(x + 1) + ': ' + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]))
+        else:
+            # Printing the step with substitutions
+            tokens = steps[x].tokens
+            locations = steps[x].locations
+            # Skip the word "You"
+            i = 2
+            line = 'Step ' + str(x + 1) + ': ' + str(tokens[1].text[0:1].upper()) + str(tokens[1].text[1:]) + ' '
+            while i < len(tokens):
+                for loc in locations:
+                    if i == locations[loc][0]:
+                        i = locations[loc][1] + 1
+                        if ingredients[loc][0] == -1:
+                            if tokens[locations[loc][0] - 1].text == ',':
+                                line = line[0:-2] + ' '
+                            if tokens[locations[loc][0] - 1].text == 'and':
+                                line = line[0:-4]
+                                if tokens[locations[loc][0] - 2].text == ',':
+                                    line = line[0:-2] + ' '
+                            continue
+                        for t in ingredients[loc][:-1]:
+                            line += ((str(t).strip() + ' ') if t else '')
+                        continue
+                if i == len(tokens):
+                    break
+                if tokens[i].text in [',', '.', ';']:
+                    line = line[0:-1]
+                line += tokens[i].text + ' '
+                i += 1
+            print(line)
         print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
         print('\tTools: ' + ', '.join(steps[x].get_tools())) if steps[x].get_tools() else 0
         print('\tIngredients: ' + ', '.join(steps[x].ingredients)) if steps[x].ingredients else 0
         print('\tPrimary Method: ' + steps[x].primary_method + ' %d minutes' % steps[x].time) if steps[x].primary_method else 0
+        print(steps[x].locations)
         print()
     print(get_primary_method(steps))
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[-1])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[2])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
@@ -396,7 +478,7 @@ if __name__ == "__main__":
             display_recipe(ingredients, steps, '')
         # Make a non-vegetarian recipe vegetarian
         elif val == '1':
-            convert_vegetarian(steps)
+            convert_vegetarian(ingredients, steps)
         # Make a vegetarian recipe non-vegetarian
         elif val == '2':
             pass
