@@ -31,7 +31,8 @@ urls = [
     base_url + '60598',  # 4. Vegetarian Korma
     base_url + '240425',  # 5. Dutch Oven Vegetable Beef Soup
     base_url + '258077',  # 6. Soondubu Jjigae (Korean Soft Tofu Stew)
-    base_url + '262353'  # 7. Buffalo Tofu Wings
+    base_url + '262353',  # 7. Buffalo Tofu Wings
+    base_url + '242352' #8. Greek Lemon Chicken n Potatoes
     ]
 # AllRecipes URL to parse
 url = None
@@ -102,6 +103,7 @@ unhealthy_products = [
     'butter', 'canola oil', 'vegetable oil', 'bacon', 'chicken', 'beef', 'pork',
     'venison', 'noodles', 'pasta', 'rice', 'couscous', 'croutons', 'salt'
 ]
+
 # Maps unhealthy products to suitable healthy replacements
 healthy_replacements = {  # Buckwheat?
     'coconut butter': ['butter'],
@@ -112,8 +114,33 @@ healthy_replacements = {  # Buckwheat?
     'zoodles': ['noodles', 'pasta'],
     'quinoa': ['rice', 'couscous'],
     'nuts': ['croutons'],
-    'garlic powder': ['salt']
+    'garlic powder': ['salt'],
+    'greek yogurt': ['sour cream'],
+    'kale': ['lettuce'],
+    'skim milk': ['milk']
 }
+
+healthy_products = [
+    'coconut butter', 'coconut oil', 'margarine', 'olive oil', 'vegetable oil', 'applesauce', 'sweetener', 'date', 'honey','cauliflower', 'broccoli',
+    'bread', 'yogurt','cream', 'rice', 'quinoa', 'couscous', 'water', 'milk'
+    ]
+
+unhealthy_replacements = {
+    'butter': ['coconut butter', 'margarine', 'olive oil'],
+    'canola oil': ['coconut oil', 'vegetable oil'],
+    'sugar': ['applesauce', 'sweetener', 'date', 'honey'],
+    'sour cream': ['yogurt','cream'],
+    'potatoes': ['cauliflower', 'broccoli'],
+    'cheese': [],
+    'white bread': ['bread'],
+    'white rice': ['rice', 'quinoa', 'couscous'],
+    'soda': ['water'],
+    'whole milk': ['milk']
+}
+
+#spices 
+indian_spices = ['cumin', 'turmeric', 'paprika', 'cardamom', 'masala', 'cinnamon', 'cloves']
+indian_food = ['naan', 'paratha']
 
 
 class Step:
@@ -347,22 +374,26 @@ def get_primary_method(steps):
     """
     max = 0
     max_step = "0"
-    for step in steps:
+    stepnum = None
+    for ind, step in enumerate(steps):
         if step.primary_method == '':
             continue
         if step.time > max:
             max = step.time
             max_step = step.primary_method
+            stepnum = ind
         elif step.time == max:
             if max_step in primary_verbs:
                 continue
             max_step = step.primary_method
+            stepnum = ind
     if max_step == "0":
-        directions_text = soup.find_all(class_='directions--section__steps')[0].text.lower()
         for verb in reversed(primary_verbs):
-            if verb in directions_text:
-                max_step = verb
-    return "Primary cooking method is " + max_step + "."  # + " for %d minutes." % max
+            for ind, step in enumerate(steps):
+                if verb in step.text:
+                    max_step = verb
+                    stepnum = ind
+    return (max_step, stepnum)
 
 
 def convert_to_vegetarian(ingredients, steps):
@@ -401,11 +432,6 @@ def convert_from_vegetarian(ingredients, steps):
     addBacon = True
     for ingredient in ingredients:
         nonveg_ingredients[ingredient] = ingredients[ingredient]
-        # for meat in meat_products:
-        #     if meat in ingredients[ingredient][4]:
-        #         # This recipe was already non-vegetarian
-        #         display_recipe(ingredients, steps, 'Original, Non-Vegetarian ')
-        #         return
         for veggie in vegetarian_foods:
             if veggie in ingredients[ingredient][4]:
                 addBacon = False
@@ -415,11 +441,34 @@ def convert_from_vegetarian(ingredients, steps):
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         nonveg_ingredients[m_key] = mod
-    display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', True)
+    display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', bacon=addBacon)
 
 
 def convert_from_healthy(ingredients, steps):
-    pass
+    """Converts a recipe to unhealhty.
+    """
+    unhealth_ingredients = {}
+    modified_ingredients = {}
+    sprinklecheese = True
+    for ingredient in ingredients:
+        unhealth_ingredients[ingredient] = ingredients[ingredient]
+        for meat in meat_products:
+            if meat in ingredients[ingredient][4] and 'broth' not in ingredients[ingredient][4]:
+                replacement = "deep fried " + ingredients[ingredient][4]
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+                sprinklecheese = False
+                continue
+        for healthy in healthy_products:
+            if healthy in ingredient and 'heavy' not in ingredient:
+                replacement = None
+                for unhealthy in unhealthy_replacements:
+                    if healthy in unhealthy_replacements[unhealthy]:
+                        replacement = unhealthy
+                if replacement:
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+    for m_key, mod in modified_ingredients.items():
+        unhealth_ingredients[m_key] = mod
+    display_recipe(unhealth_ingredients, steps, 'Un-healthy ', sprinklecheese=sprinklecheese)
 
 
 def convert_to_healthy(ingredients, steps):
@@ -430,16 +479,35 @@ def convert_to_healthy(ingredients, steps):
     for ingredient in ingredients:
         healthy_ingredients[ingredient] = ingredients[ingredient]
         for unhealthy in unhealthy_products:
-                if unhealthy in ingredients[ingredient][4]:
-                    replacement = None
-                    for healthy in healthy_replacements:
-                        if unhealthy in healthy_replacements[healthy]:
-                            replacement = healthy
-                    if replacement:
-                        modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+            if unhealthy in ingredients[ingredient][4]:
+                replacement = None
+                for healthy in healthy_replacements:
+                    if unhealthy in healthy_replacements[healthy]:
+                        replacement = healthy
+                if replacement:
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         healthy_ingredients[m_key] = mod
     display_recipe(healthy_ingredients, steps, 'Healthy ')
+
+
+def convert_to_indian(ingredients, steps):
+    """Converts to Indian cuisine.
+    """
+    modified_ingredients = {}
+    indian_ingredients = {}
+    for ingredient in ingredients:
+        indian_ingredients[ingredient] = ingredients[ingredient]
+        for meat in meat_products:
+            if meat in ingredient:
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, random.choice(["lamb", 'chicken']))
+    text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
+    for spice in indian_spices:
+        if spice not in text_set:
+            modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
+    for m_key, mod in modified_ingredients.items():
+        indian_ingredients[m_key] = mod 
+    display_recipe(indian_ingredients, steps, 'Indian Version of ', addNaan=True)
 
 
 def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement):
@@ -472,12 +540,14 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
             condense = None
             break
     if condense is not None:
-        amt1 = modified_ingredients[condense][0]
-        unit1 = modified_ingredients[condense][1]
-        amt2 = ingredients[ingredient][0]
+        amt1 = modified_ingredients[condense][0] if modified_ingredients[condense][0] is not None else 0
+        unit1 = modified_ingredients[condense][1] 
+        amt2 = ingredients[ingredient][0] if ingredients[ingredient][0] is not None else 0
         unit2 = ingredients[ingredient][1]
         sum = amt1 + amt2
         sum_unit = unit1
+        if unit2 == '':
+            unit2 = unit1
         if unit1 != unit2:
             if unit1[-1] == 's':
                 unit1 = unit1[:-1]
@@ -549,7 +619,7 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
     return modified_ingredients
 
 
-def display_recipe(ingredients, steps, style, bacon=False):
+def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False, addNaan=False):
     """Given a set of ingredients and steps,
     display them in a nice way to the user.
     """
@@ -566,7 +636,14 @@ def display_recipe(ingredients, steps, style, bacon=False):
             print(line)
     if bacon:
         print("Bacon bits, to taste")
+    if sprinklecheese:
+        print('Shredded cheese, to taste')
+    if addNaan:
+        print('Naan bread, as many as you prefer')
     print()
+    primary_method, method_index = get_primary_method(steps)
+    if addNaan:
+        print('Step 0: Prepare a mixture of the cumin, turmeric, paprika, cardamom, masala, cinnamon, cloves for later use\n')
     for x in range(len(steps)):
         modified = False
         for i in steps[x].ingredients:
@@ -574,7 +651,7 @@ def display_recipe(ingredients, steps, style, bacon=False):
                 modified = True
                 break
         if not modified:
-            print('Step ' + str(x + 1) + ': ' + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]))
+            print('Step ' + str(x + 1) + ': ' + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]) + (', adding in spices from Step 0' if addNaan and x == method_index else ''))
         else:
             # Printing the step with substitutions
             tokens = steps[x].tokens
@@ -612,6 +689,9 @@ def display_recipe(ingredients, steps, style, bacon=False):
                     line = line[0:-1]
                 line += tokens[i].text + ' '
                 i += 1
+            if x == method_index and addNaan:
+                line = line.strip()
+                line += ', adding in the prepared spices from Step 0'
             print(line)
         if debug:
             print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
@@ -621,11 +701,15 @@ def display_recipe(ingredients, steps, style, bacon=False):
         print()
     if bacon:
         print('Step ' + str(len(steps) + 1) + ': Sprinkle on bacon bits. Enjoy!')
-    print(get_primary_method(steps))
+    if sprinklecheese:
+        print('Step ' + str(len(steps) + 1) + ': Sprinkle on cheese. Enjoy!')
+    if addNaan:
+        print('Step ' + str(len(steps) + 1) + ': Eat with Naan. Enjoy!')
+    print('Primary cooking method is: ' + primary_method)
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[7])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[3])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
@@ -657,10 +741,10 @@ if __name__ == "__main__":
             convert_to_healthy(ingredients, steps)
         # Make a recipe unhealth
         elif val == '4':
-            pass
+            convert_from_healthy(ingredients,steps)
         # Unused
         elif val == '5':
-            pass
+            convert_to_indian(ingredients, steps)
         # Unused
         elif val == '6':
             pass
@@ -674,7 +758,7 @@ if __name__ == "__main__":
 2: Convert From Vegetarian
 3: Convert to Healthy Style
 4: Convert from Healthy Style
-5: Convert to ____ Style
+5: Convert to Indian Style
 6: Convert to ____ Style
 D1: Difficulty level 1 (Easy)
 D2: Difficulty level 2 (Medium)
