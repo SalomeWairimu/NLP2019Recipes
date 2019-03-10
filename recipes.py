@@ -170,6 +170,9 @@ indian_food = ['naan', 'paratha']
 ethiopian_spices = ['fenugreek', 'new mexico chiles', 'paprika', 'nutmeg', 'cloves', 'onion powder']
 ethiopian_food = ['injera']
 
+ukrainian_spices = ['chives', 'thyme', 'dill', 'caraway', 'parsley']
+ukrainain_foods = ['borsch']
+
 
 class Step:
     def __init__(self, text):
@@ -555,6 +558,26 @@ def convert_to_ethiopian(ingredients, steps):
         ethiopian_ingredients[m_key] = mod 
     display_recipe(ethiopian_ingredients, steps, 'Ethiopian Version of ', addInjera=True)
 
+
+def convert_to_ukrainian(ingredients, steps):
+    """Converts to Ethiopian cuisine.
+    """
+    modified_ingredients = {}
+    ukrainian_ingredients = {}
+    for ingredient in ingredients:
+        ukrainian_ingredients[ingredient] = ingredients[ingredient]
+        for meat in meat_products:
+            if meat in ingredient:
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'duck')
+    text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
+    for spice in ukrainian_spices:
+        if spice not in text_set:
+            modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
+    for m_key, mod in modified_ingredients.items():
+        ukrainian_ingredients[m_key] = mod 
+    display_recipe(ukrainian_ingredients, steps, 'Ukrainian Version of ', addBorsch=True)
+
+
 def convert_to_vegan(ingredients, steps):
     """Converts a recipe to vegan.
     """
@@ -717,7 +740,7 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
     return modified_ingredients
 
 
-def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False, addNaan=False, addInjera=False):
+def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False, addNaan=False, addInjera=False, addBorsch=False):
     """Given a set of ingredients and steps,
     display them in a nice way to the user.
     """
@@ -740,12 +763,16 @@ def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False,
         print('Naan bread, as many as you prefer')
     if addInjera:
         print('Injera, as much as you prefer')
+    if addBorsch:
+        print('A cup of borsch as an appetizer')
     print()
     primary_method, method_index = get_primary_method(steps)
     if addNaan:
         print('Step 0: Prepare a mixture of the cumin, turmeric, paprika, cardamom, masala, cinnamon, cloves for later use\n')
     if addInjera:
         print('Step 0: To prepare berbere sauce for use later, mix fenugreek, new mexico chiles, paprika, nutmeg, cloves, onion powder\n')
+    if addBorsch:
+        print('Step 0: Prepare borsch (purchased from a Ukrainian deli) and prepare mixture of chive, dill, thyme, caraway, parsley\n')
     for x in range(len(steps)):
         modified = False
         for i in steps[x].ingredients:
@@ -758,6 +785,8 @@ def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False,
                 line = ', adding in spices from Step 0'
             if addInjera and  x == method_index:
                 line= ', adding in the berbere sauce from Step 0'
+            if addBorsch and x == method_index:
+                line = ', adding in spices from Step 0'
             print('Step ' + str(x + 1) + ': ' + str(steps[x].text[4:5].upper()) + str(steps[x].text[5:]) + line)
         else:
             # Printing the step with substitutions
@@ -802,6 +831,9 @@ def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False,
             if x == method_index and addInjera:
                 line = line.strip()
                 line += ', adding in the berbere sauce from Step 0'
+            if x == method_index and addBorsch:
+                line = line.strip()
+                line += ', adding in the spices from Step 0'
             print(line)
         if debug:
             print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
@@ -817,6 +849,8 @@ def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False,
         print('Step ' + str(len(steps) + 1) + ': Eat with Naan. Enjoy!')
     if addInjera:
         print('Step ' + str(len(steps) + 1) + ': Serve with Injera. Enjoy!')
+    if addBorsch:
+        print('Step ' + str(len(steps) + 1) + ': Serve with Borsch. Enjoy!')
     print('Primary cooking method is: ' + primary_method)
 
 
@@ -864,6 +898,8 @@ if __name__ == "__main__":
             convert_to_vegan(ingredients, steps)
         elif val == '8':
             convert_from_vegan(ingredients, steps)
+        elif val == '9':
+            convert_to_ukrainian(ingredients,steps)
         # Invalid option
         else:
             print("Invalid option: " + val)
@@ -878,6 +914,7 @@ if __name__ == "__main__":
 6: Convert to Ethiopian Style
 7: Convert to Vegan
 8: Convert from Vegan
+9: Convert to Ukrainian
 D1: Difficulty level 1 (Easy)
 D2: Difficulty level 2 (Medium)
 D3: Difficult level 3 (Hard)
