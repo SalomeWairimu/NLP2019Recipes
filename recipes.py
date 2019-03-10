@@ -200,7 +200,7 @@ spanish_replacements = {
 thai_spices = ['garlic', 'chopped shallots', 'red chilis', 'galangal', 'basil', 'kaffir lime leaves']
 
 ukrainian_spices = ['chives', 'thyme', 'dill', 'caraway', 'parsley']
-ukrainain_foods = ['borsch']
+ukrainian_foods = ['borsch']
 
 
 class Step:
@@ -598,7 +598,7 @@ def convert_to_thai(ingredients, steps):
         for meat in meat_products:
             if meat in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'beef')
-    text_set = soup.find_all(class = 'recipe-ingredients')[0].text.lower()
+    text_set = soup.find_all(class_= 'recipe-ingredients')[0].text.lower()
     for spice in thai_spices:
         if spice not in text_set:
             modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
@@ -653,6 +653,25 @@ def convert_to_spanish(ingredients, steps):
             continue
         spanish_ingredients[m_key] = mod
     display_recipe(spanish_ingredients, steps, 'Hispanic Version of ', addCheese=addCheese, addJalepenos=addJalepenos)
+
+
+def convert_to_ukrainian(ingredients, steps):
+    """Converts to Ethiopian cuisine.
+    """
+    modified_ingredients = {}
+    ukrainian_ingredients = {}
+    for ingredient in ingredients:
+        ukrainian_ingredients[ingredient] = ingredients[ingredient]
+        for meat in meat_products:
+            if meat in ingredient:
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'duck')
+    text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
+    for spice in ukrainian_spices:
+        if spice not in text_set:
+            modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
+    for m_key, mod in modified_ingredients.items():
+        ukrainian_ingredients[m_key] = mod
+    display_recipe(ukrainian_ingredients, steps, 'Ukrainian Version of ', addBorsch=True)
 
 
 def convert_to_vegan(ingredients, steps):
