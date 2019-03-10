@@ -173,7 +173,7 @@ ethiopian_food = ['injera']
 thai_spices = ['garlic', 'chopped shallots', 'red chilis', 'galangal', 'basil', 'kaffir lime leaves']
 
 ukrainian_spices = ['chives', 'thyme', 'dill', 'caraway', 'parsley']
-ukrainain_foods = ['borsch']
+ukrainian_foods = ['borsch']
 
 
 class Step:
@@ -553,7 +553,7 @@ def convert_to_thai(ingredients, steps):
         for meat in meat_products:
             if meat in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'beef')
-    text_set = soup.find_all(class = 'recipe-ingredients')[0].text.lower()
+    text_set = soup.find_all(class_= 'recipe-ingredients')[0].text.lower()
     for spice in thai_spices:
         if spice not in text_set:
             modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
@@ -579,6 +579,25 @@ def convert_to_ethiopian(ingredients, steps):
     for m_key, mod in modified_ingredients.items():
         ethiopian_ingredients[m_key] = mod 
     display_recipe(ethiopian_ingredients, steps, 'Ethiopian Version of ', addInjera=True)
+
+
+def convert_to_ukrainian(ingredients, steps):
+    """Converts to Ethiopian cuisine.
+    """
+    modified_ingredients = {}
+    ukrainian_ingredients = {}
+    for ingredient in ingredients:
+        ukrainian_ingredients[ingredient] = ingredients[ingredient]
+        for meat in meat_products:
+            if meat in ingredient:
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'duck')
+    text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
+    for spice in ukrainian_spices:
+        if spice not in text_set:
+            modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
+    for m_key, mod in modified_ingredients.items():
+        ukrainian_ingredients[m_key] = mod 
+    display_recipe(ukrainian_ingredients, steps, 'Ukrainian Version of ', addBorsch=True)
 
 
 def convert_to_vegan(ingredients, steps):
@@ -904,11 +923,11 @@ if __name__ == "__main__":
         elif val == '7':
             convert_to_thai(ingredients, steps)
         elif val == '8':
-            convert_to_vegan(ingredients, steps)
-        elif val == '9':
-            convert_from_vegan(ingredients, steps)
-        elif val == '10':
             convert_to_ukrainian(ingredients,steps)
+        elif val == '9':
+            convert_to_vegan(ingredients, steps)
+        elif val == '10':
+            convert_from_vegan(ingredients, steps)
         # Invalid option
         else:
             print("Invalid option: " + val)
@@ -922,9 +941,9 @@ if __name__ == "__main__":
 5: Convert to Indian Style
 6: Convert to Ethiopian Style
 7: Convert to Thai Style
-8: Convert to Vegan
-9: Convert from Vegan
-10: Convert to Ukranian
+8: Convert to Ukrainain Style
+9: Convert to Vegan
+10: Convert from Vegan
 D1: Difficulty level 1 (Easy)
 D2: Difficulty level 2 (Medium)
 D3: Difficult level 3 (Hard)
