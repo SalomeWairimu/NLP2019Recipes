@@ -519,7 +519,7 @@ def convert_from_vegetarian(ingredients, steps):
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         nonveg_ingredients[m_key] = mod
-    display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', bacon=addBacon)
+    display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', addBacon=addBacon)
 
 
 def convert_to_healthy(ingredients, steps):
@@ -566,7 +566,7 @@ def convert_from_healthy(ingredients, steps):
                     modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         unhealth_ingredients[m_key] = mod
-    display_recipe(unhealth_ingredients, steps, 'Unhealthy ', sprinklecheese=sprinklecheese)
+    display_recipe(unhealth_ingredients, steps, 'Unhealthy ', addCheese=sprinklecheese)
 
 
 def convert_to_indian(ingredients, steps):
@@ -598,7 +598,7 @@ def convert_to_thai(ingredients, steps):
         for meat in meat_products:
             if meat in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'beef')
-    text_set = soup.find_all(class_= 'recipe-ingredients')[0].text.lower()
+    text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
     for spice in thai_spices:
         if spice not in text_set:
             modified_ingredients[spice] = (1, 'teaspoon', '', '', spice, 1)
@@ -726,7 +726,7 @@ def convert_from_vegan(ingredients, steps):
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         nonvegan_ingredients[m_key] = mod
-    display_recipe(nonvegan_ingredients, steps, 'Non-Vegan ', sprinklecheese=sprinklecheese)
+    display_recipe(nonvegan_ingredients, steps, 'Non-Vegan ', addCheese=sprinklecheese)
 
 
 def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement):
@@ -844,7 +844,7 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
     return modified_ingredients
 
 
-def display_recipe(ingredients, steps, style, addBacon=False, addCheese=False, addNaan=False, addInjera=False, addJalepenos=False):
+def display_recipe(ingredients, steps, style, addBacon=False, addCheese=False, addNaan=False, addInjera=False, addJalepenos=False, addBorsch=False, addThai=False):
     """Given a set of ingredients and steps,
     display them in a nice way to the user.
     """
