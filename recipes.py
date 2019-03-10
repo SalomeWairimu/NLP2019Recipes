@@ -9,13 +9,9 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from measurement.measures import Volume, Weight
 from measurement.utils import guess
-# import nltk
-# from nltk import word_tokenize
 import spacy
 
 ssl._create_default_https_context = ssl._create_unverified_context
-# nltk.download('punkt')
-# nltk.download('averaged_perceptron_tagger')
 debug = False
 
 base_url = 'https://www.allrecipes.com/recipe/'
@@ -33,7 +29,8 @@ urls = [
     base_url + '258077',  # 6. Soondubu Jjigae (Korean Soft Tofu Stew)
     base_url + '262353',  # 7. Buffalo Tofu Wings
     base_url + '242352',  # 8. Greek Lemon Chicken and Potatoes
-    base_url + '25333'    # 9. Vegan Black Bean Soup
+    base_url + '25333',   # 9. Vegan Black Bean Soup
+    base_url + '215012'   # 10. Spicy Tuna Fish Cakes
     ]
 # AllRecipes URL to parse
 url = None
@@ -103,7 +100,8 @@ veggie_replacements = {
     }
 # Used to help convert from non-vegan to vegan
 other_animal_products = [
-    'milk', 'butter', 'cheese', 'honey', 'yogurt', 'sour cream', 'buttermilk', 'mayonnaise', 'gelatin', 'ice cream', 'chocolate', 'sugar'
+    'milk', 'butter', 'cheese', 'honey', 'yogurt', 'sour cream', 'buttermilk',
+    'mayonnaise', 'gelatin', 'ice cream', 'chocolate', 'sugar', 'egg'
     ]
 # Maps non-vegan products to vegan replacements
 vegan_replacements = {
@@ -115,7 +113,7 @@ vegan_replacements = {
     'agar flakes': ['gelatin'],
     'sweetener': ['honey'],
     'soy milk': ['milk'],
-    'tofu scaramble': ['egg'],
+    'cube(s) of tofu': ['egg'],
     'olive oil': ['butter'],
     'fructose': ['sugar'],
     'cocoa powder': ['chocolate'],
@@ -395,10 +393,10 @@ def get_ingredients():
         product = sum * product
         potential_unit = tokens[posn + 1] if posn + 1 < len(tokens) else tokens[posn]
         if not potential_unit.tag_.startswith('JJ'):
-            unit = potential_unit.text if is_unit(potential_unit.text) else None
+            unit = potential_unit.text if is_unit(potential_unit.text) else ''
         else:
             second_unit = potential_unit.head.text
-            unit = (potential_unit.text + ' ' + second_unit) if is_unit(second_unit) else None
+            unit = (potential_unit.text + ' ' + second_unit) if is_unit(second_unit) else ''
             posn += 1 if unit else 0
         if posn + 2 < len(tokens) and tokens[posn + 2].text == ')':
             posn += 2
@@ -438,9 +436,7 @@ def get_instructions():
     for instruct in instructions:
         text = instruct.text.strip().split('.')
         # AllRecipes sometimes puts videos on the page, so skip these
-        if text == 'Watch Now':
-            continue
-        steps += [Step(t) for t in text if len(t) > 0]
+        steps += [Step(t) for t in text if len(t) > 0 and 'Watch Now' not in t]
     return steps
 
 
@@ -534,7 +530,7 @@ def convert_to_healthy(ingredients, steps):
     for ingredient in ingredients:
         healthy_ingredients[ingredient] = ingredients[ingredient]
         for unhealthy in unhealthy_products:
-            if unhealthy in ingredients[ingredient][4]:
+            if unhealthy in ingredient and 'broth' not in ingredient and 'soup' not in ingredient and '-flavo' not in ingredient:
                 replacement = None
                 for healthy in healthy_replacements:
                     if unhealthy in healthy_replacements[healthy]:
@@ -735,6 +731,18 @@ def convert_from_vegan(ingredients, steps):
     for m_key, mod in modified_ingredients.items():
         nonvegan_ingredients[m_key] = mod
     display_recipe(nonvegan_ingredients, steps, 'Non-Vegan ', addCheese=sprinklecheese)
+
+
+def change_cooking_method(ingredients, steps):
+    new_cooking_method = input("New cooking method: ")
+    primary_method, index = get_primary_method(steps)
+    new_steps = []
+    for i, step in enumerate(steps):
+        if i == index:
+            new_steps.append(Step(step.text[4:].replace(primary_method, new_cooking_method)))
+        else:
+            new_steps.append(step)
+    display_recipe(ingredients, new_steps, '')
 
 
 def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement):
@@ -972,23 +980,23 @@ def display_recipe(ingredients, steps, style, addBacon=False, addCheese=False, a
             print('\tActions: ' + ', '.join(steps[x].get_verbs())) if steps[x].get_verbs() else 0
             print('\tTools: ' + ', '.join(steps[x].get_tools())) if steps[x].get_tools() else 0
             print('\tIngredients: ' + ', '.join(steps[x].ingredients)) if steps[x].ingredients else 0
-            print('\tPrimary Method: ' + steps[x].primary_method + ' %d minutes' % steps[x].time) if steps[x].primary_method else 0
+            print('\tMethod: ' + steps[x].primary_method + ' %d minutes' % steps[x].time) if steps[x].primary_method else 0
         print()
     if addBacon:
-        print('Step ' + str(len(steps) + 1) + ': Sprinkle on bacon bits. Enjoy!')
+        print('Step ' + str(len(steps) + 1) + ': Sprinkle on bacon bits. Enjoy!\n')
     if addCheese:
-        print('Step ' + str(len(steps) + 1) + ': Sprinkle on cheese. Enjoy!')
+        print('Step ' + str(len(steps) + 1) + ': Sprinkle on cheese. Enjoy!\n')
     if addNaan:
-        print('Step ' + str(len(steps) + 1) + ': Eat with Naan. Enjoy!')
+        print('Step ' + str(len(steps) + 1) + ': Eat with Naan. Enjoy!\n')
     if addInjera:
-        print('Step ' + str(len(steps) + 1) + ': Serve with Injera. Enjoy!')
+        print('Step ' + str(len(steps) + 1) + ': Serve with Injera. Enjoy!\n')
     if addBorsch:
-        print('Step ' + str(len(steps) + 1) + ': Serve with Borsch. Enjoy!')
+        print('Step ' + str(len(steps) + 1) + ': Serve with Borsch. Enjoy!\n')
     print('Primary cooking method is: ' + primary_method)
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[9])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[0])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
@@ -1042,6 +1050,9 @@ if __name__ == "__main__":
         # Make a vegan recipe non-vegan
         elif val == '11':
             convert_from_vegan(ingredients, steps)
+        # Change the primary cooking method
+        elif val == '12':
+            change_cooking_method(ingredients, steps)
         # Invalid option
         else:
             print("Invalid option: " + val)
@@ -1059,6 +1070,8 @@ if __name__ == "__main__":
 9: Convert to Ukranian Style
 10: Convert to Vegan
 11: Convert from Vegan
+12: Change cooking method
+~: Toggle debug printing
 Q: Quit\n>>""").strip().lower()
         os.system('cls') if platform.platform().lower().startswith('windows') else os.system('clear')
     print("Goodbye!")
