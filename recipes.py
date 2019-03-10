@@ -32,7 +32,8 @@ urls = [
     base_url + '240425',  # 5. Dutch Oven Vegetable Beef Soup
     base_url + '258077',  # 6. Soondubu Jjigae (Korean Soft Tofu Stew)
     base_url + '262353',  # 7. Buffalo Tofu Wings
-    base_url + '242352' #8. Greek Lemon Chicken n Potatoes
+    base_url + '242352',  #8. Greek Lemon Chicken n Potatoes
+    base_url + '25333'    #9. Vegan Black Bean Soup
     ]
 # AllRecipes URL to parse
 url = None
@@ -91,13 +92,37 @@ meat_products = [
     'beef', 'chicken', 'pork', 'bacon', 'sausage', 'ham', 'lamb', 'meat',
     'venison', 'veal', 'steak', 'ribs', 'filet mignon', 'shrimp', 'snail',
     'oyster', 'fish', 'tilapia', 'tuna', 'salmon', 'walleye', 'mussels',
-    'pepperoni', 'salami', 'patty', 'turkey'
+    'pepperoni', 'salami', 'patty', 'turkey', 'duck', 'goat', 'liver'
     ]
 # Maps meat products to suitable vegetarian replacements
 veggie_replacements = {
     'seitan': ['chicken', 'pork', 'filet mignon', 'steak', 'venison', 'lamb', 'meat', 'ribs', 'turkey'],  # beef
     'tempeh': ['fish', 'tilapia', 'tuna', 'salmon', 'walleye']
     }
+
+other_animal_products = [
+    'milk', 'butter', 'cheese', 'honey', 'yogurt', 'sour cream', 'buttermilk', 'mayonnaise', 'gelatin', 'ice cream', 'chocolate', 'sugar'
+    ]
+
+vegan_replacements = {
+    'margarine': ['butter'],
+    'coconut milk': ['sour cream'],
+    'coconut cream': ['yogurt'],
+    'vegan gourmet cheese': ['cheese'],
+    'cashew buttermilk': ['buttermilk'],
+    'agar flakes': ['gelatin'],
+    'sweetener': ['honey'],
+    'soy milk': ['milk'],
+    'tofu scaramble': ['egg'],
+    'olive oil': ['butter'],
+    'fructose': ['sugar'],
+    'cocoa powder': ['chocolate'],
+    'sorbet': ['ice cream'],
+    'black beans': ['beef', 'chicken'],
+    'seitan': ['chicken', 'pork', 'filet mignon', 'steak', 'venison', 'lamb', 'meat', 'ribs', 'turkey'],  # beef
+    'tempeh': ['fish', 'tilapia', 'tuna', 'salmon', 'walleye']
+}
+
 # Used to help conversion from unhealthy to healthy
 unhealthy_products = [
     'butter', 'canola oil', 'vegetable oil', 'bacon', 'chicken', 'beef', 'pork',
@@ -530,6 +555,59 @@ def convert_to_ethiopian(ingredients, steps):
         ethiopian_ingredients[m_key] = mod 
     display_recipe(ethiopian_ingredients, steps, 'Ethiopian Version of ', addInjera=True)
 
+def convert_to_vegan(ingredients, steps):
+    """Converts a recipe to vegan.
+    """
+    vegan_ingredients = {}
+    modified_ingredients = {}
+    for ingredient in ingredients:
+        vegan_ingredients[ingredient] = ingredients[ingredient]
+        if 'soup' in ingredients[ingredient][4] or 'broth' in ingredients[ingredient][4]:
+            for meat in meat_products:
+                if meat in ingredients[ingredient][4]:
+                    replacement = "cream of mushroom soup" if 'cream' in ingredients[ingredient][4] else "vegetable broth"
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+        else:
+            for meat in meat_products:
+                if meat in ingredient:
+                    replacement = "tofu"
+                    for veggie in veggie_replacements:
+                        if meat in veggie_replacements[veggie]:
+                            replacement = veggie
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+            for prod in other_animal_products:
+                if prod in ingredient:
+                    replacement = "vegan " + ingredients[ingredient][4]
+                    for rep in vegan_replacements:
+                        if prod in vegan_replacements[rep]:
+                            replacement = rep
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)  
+    for m_key, mod in modified_ingredients.items():
+        vegan_ingredients[m_key] = mod
+    display_recipe(vegan_ingredients, steps, 'Vegan ')
+
+def convert_from_vegan(ingredients, steps):
+    """Converts a recipe from vegan.
+    """
+    nonvegan_ingredients = {}
+    modified_ingredients = {}
+    vegan_foods = [*vegan_replacements]
+    vegan_foods.append('tofu')
+    sprinklecheese = True
+    for ingredient in ingredients:
+        nonvegan_ingredients[ingredient] = ingredients[ingredient]
+        for veg in vegan_foods:
+            if veg in ingredient:
+                print(ingredients[ingredient])
+                sprinklecheese = False
+                replacement = "beef"
+                if veg in vegan_replacements:
+                    replacement = vegan_replacements[veg][0]
+                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+    for m_key, mod in modified_ingredients.items():
+        nonvegan_ingredients[m_key] = mod
+    display_recipe(nonvegan_ingredients, steps, 'Non-Vegan ', sprinklecheese=sprinklecheese)
+
 def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement):
     """Given a tentative replacement during a transformation process, checks
     to ensure that the ingredient has not already been used. If it has, will
@@ -743,7 +821,7 @@ def display_recipe(ingredients, steps, style, bacon=False, sprinklecheese=False,
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[3])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[9])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
@@ -782,6 +860,10 @@ if __name__ == "__main__":
         # Unused
         elif val == '6':
             convert_to_ethiopian(ingredients, steps)
+        elif val == '7':
+            convert_to_vegan(ingredients, steps)
+        elif val == '8':
+            convert_from_vegan(ingredients, steps)
         # Invalid option
         else:
             print("Invalid option: " + val)
@@ -794,6 +876,8 @@ if __name__ == "__main__":
 4: Convert from Healthy Style
 5: Convert to Indian Style
 6: Convert to Ethiopian Style
+7: Convert to Vegan
+8: Convert from Vegan
 D1: Difficulty level 1 (Easy)
 D2: Difficulty level 2 (Medium)
 D3: Difficult level 3 (Hard)
