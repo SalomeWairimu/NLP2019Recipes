@@ -721,13 +721,17 @@ def convert_from_vegan(ingredients, steps):
     sprinklecheese = True
     for ingredient in ingredients:
         nonvegan_ingredients[ingredient] = ingredients[ingredient]
-        for veg in vegan_foods:
-            if veg in ingredient:
-                sprinklecheese = False
-                replacement = "beef"
-                if veg in vegan_replacements:
-                    replacement = vegan_replacements[veg][0]
-                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+        if 'broth' in ingredient:
+            replacement = 'chicken broth'
+            modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+        else:
+            for veg in vegan_foods:
+                if veg in ingredient:
+                    sprinklecheese = False
+                    replacement = "beef"
+                    if veg in vegan_replacements:
+                        replacement = vegan_replacements[veg][0]
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         nonvegan_ingredients[m_key] = mod
     display_recipe(nonvegan_ingredients, steps, 'Non-Vegan ', addCheese=sprinklecheese)
@@ -984,7 +988,7 @@ def display_recipe(ingredients, steps, style, addBacon=False, addCheese=False, a
 
 
 if __name__ == "__main__":
-    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[3])
+    get_recipe(sys.argv[1] if (len(sys.argv) > 1) else urls[9])
     ingredients = get_ingredients()
     steps = get_instructions()
     val = '0'
