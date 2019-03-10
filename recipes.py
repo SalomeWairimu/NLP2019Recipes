@@ -465,13 +465,17 @@ def convert_from_vegetarian(ingredients, steps):
     addBacon = True
     for ingredient in ingredients:
         nonveg_ingredients[ingredient] = ingredients[ingredient]
-        for veggie in vegetarian_foods:
-            if veggie in ingredients[ingredient][4]:
-                addBacon = False
-                replacement = "beef"
-                if veggie in veggie_replacements:
-                    replacement = veggie_replacements[veggie][0]
-                modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+        if 'broth' in ingredient:
+            replacement = 'chicken broth'
+            modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
+        else:
+            for veggie in vegetarian_foods:
+                if veggie in ingredient:
+                    addBacon = False
+                    replacement = "beef"
+                    if veggie in veggie_replacements:
+                        replacement = veggie_replacements[veggie][0]
+                    modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
     for m_key, mod in modified_ingredients.items():
         nonveg_ingredients[m_key] = mod
     display_recipe(nonveg_ingredients, steps, 'Non-Vegetarian ', bacon=addBacon)
@@ -746,8 +750,8 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
         modified_ingredients[condense] = (
             sum,
             sum_unit,
-            modified_ingredients[condense][2],
-            modified_ingredients[condense][3],
+            '',
+            '',
             modified_ingredients[condense][4],
             1
         )
@@ -756,8 +760,8 @@ def condense_ingredients(ingredients, ingredient, modified_ingredients, steps, r
         modified_ingredients[ingredient] = (
             ingredients[ingredient][0],
             ingredients[ingredient][1],
-            ingredients[ingredient][2],
-            ingredients[ingredient][3],
+            '',
+            '',
             replacement,
             1
         )
