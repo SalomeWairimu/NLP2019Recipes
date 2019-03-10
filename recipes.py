@@ -484,12 +484,12 @@ def convert_to_vegetarian(ingredients, steps):
         # Special case for vegetarian/vean recipes: we can't just replace chicken broth with tofu broth
         if 'soup' in ingredients[ingredient][4] or 'broth' in ingredients[ingredient][4]:
             for meat in meat_products:
-                if meat in ingredients[ingredient][4]:
+                if meat in ingredient and '-flavo' not in ingredient:
                     replacement = "cream of mushroom soup" if 'cream' in ingredients[ingredient][4] else "vegetable broth"
                     modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
         else:
             for meat in meat_products:
-                if meat in ingredients[ingredient][4]:
+                if meat in ingredient and '-flavo' not in ingredient:
                     replacement = "tofu"
                     for veggie in veggie_replacements:
                         if meat in veggie_replacements[veggie]:
@@ -555,7 +555,7 @@ def convert_from_healthy(ingredients, steps):
     for ingredient in ingredients:
         unhealth_ingredients[ingredient] = ingredients[ingredient]
         for meat in meat_products:
-            if meat in ingredients[ingredient][4] and 'broth' not in ingredients[ingredient][4]:
+            if meat in ingredient and 'broth' not in ingredient and '-flavo' not in ingredient and 'soup' not in ingredient:
                 replacement = "deep fried " + ingredients[ingredient][4]
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
                 sprinklecheese = False
@@ -581,7 +581,7 @@ def convert_to_indian(ingredients, steps):
     for ingredient in ingredients:
         indian_ingredients[ingredient] = ingredients[ingredient]
         for meat in meat_products:
-            if meat in ingredient and 'broth' not in ingredient and 'soup' not in ingredient:
+            if meat in ingredient and '-flavo' not in ingredient and 'broth' not in ingredient and 'soup' not in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, random.choice(["lamb", 'chicken']))
     text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
     for spice in indian_spices:
@@ -600,7 +600,7 @@ def convert_to_thai(ingredients, steps):
     for ingredient in ingredients:
         thai_ingredients[ingredient] = ingredients[ingredient]
         for meat in meat_products:
-            if meat in ingredient:
+            if meat in ingredient and '-flavo' not in ingredient and 'soup' not in ingredient and 'broth' not in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'beef')
     text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
     for spice in thai_spices:
@@ -619,7 +619,7 @@ def convert_to_ethiopian(ingredients, steps):
     for ingredient in ingredients:
         ethiopian_ingredients[ingredient] = ingredients[ingredient]
         for meat in meat_products:
-            if meat in ingredient and 'soup' not in ingredient and 'broth' not in ingredient:
+            if meat in ingredient and '-flavo' not in ingredient and 'soup' not in ingredient and 'broth' not in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'chicken')
     text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
     for spice in ethiopian_spices:
@@ -660,14 +660,14 @@ def convert_to_spanish(ingredients, steps):
 
 
 def convert_to_ukrainian(ingredients, steps):
-    """Converts to Ethiopian cuisine.
+    """Converts to Ukranian cuisine.
     """
     modified_ingredients = {}
     ukrainian_ingredients = {}
     for ingredient in ingredients:
         ukrainian_ingredients[ingredient] = ingredients[ingredient]
         for meat in meat_products:
-            if meat in ingredient:
+            if meat in ingredient and '-flavo' not in ingredient and 'soup' not in ingredient and 'broth' not in ingredient:
                 modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, 'duck')
     text_set = soup.find_all(class_='recipe-ingredients')[0].text.lower()
     for spice in ukrainian_spices:
@@ -686,14 +686,14 @@ def convert_to_vegan(ingredients, steps):
     for ingredient in ingredients:
         vegan_ingredients[ingredient] = ingredients[ingredient]
         # Special case for vegetarian/vean recipes: we can't just replace chicken broth with tofu broth
-        if 'soup' in ingredients[ingredient][4] or 'broth' in ingredients[ingredient][4]:
+        if 'soup' in ingredient or 'broth' in ingredient:
             for meat in meat_products:
-                if meat in ingredients[ingredient][4]:
+                if meat in ingredient and '-flavo' not in ingredient:
                     replacement = "cream of mushroom soup" if 'cream' in ingredients[ingredient][4] else "vegetable broth"
                     modified_ingredients = condense_ingredients(ingredients, ingredient, modified_ingredients, steps, replacement)
         else:
             for meat in meat_products:
-                if meat in ingredient:
+                if meat in ingredient and '-flavo' not in ingredient:
                     replacement = "tofu"
                     for veggie in veggie_replacements:
                         if meat in veggie_replacements[veggie]:
@@ -1051,8 +1051,8 @@ if __name__ == "__main__":
 5: Convert to Indian Style
 6: Convert to Ethiopian Style
 7: Convert to Hispanic Style
-8: Convert to Thai
-9: Convert from Ukranian
+8: Convert to Thai Style
+9: Convert to Ukranian Style
 10: Convert to Vegan
 11: Convert from Vegan
 Q: Quit\n>>""").strip().lower()
